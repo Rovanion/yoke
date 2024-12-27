@@ -55,67 +55,6 @@ class Device:
             self.bytestring = b''
 
 
-# Override on Windows
-if system() == 'Windows':
-    class Device:
-        def __init__(self, id=1, name='Yoke', events=(), bytestring=b''):
-            super().__init__()
-            self.name = name + '-' + str(id)
-            self.device = VjoyDevice(id)
-            self.lib = self.device.lib
-            self.id = self.device.id
-            self.inStruct = '>x'
-            self.outStruct = self.device.outStruct
-            self.events = []
-            self.bytestring = bytestring
-            #a vJoy controller has up to 8 axis with fixed names, and 128 buttons with no names.
-            #TODO: Improve mapping between uinput events and vJoy controls.
-            axes = 0
-            buttons = 0
-            for event in events:
-                if event[0] == 0x01: # button/key
-                    self.events.append((event[0], buttons)); buttons += 1
-                    self.inStruct += '?'
-                elif event[0] == 0x03: # analog axis
-                    self.events.append((event[0], axes)); axes += 1
-                    self.inStruct += 'H'
-            self.inStruct = struct.Struct(self.inStruct)
-            self.axes = [0,] * 15
-            self.buttons = 0
-        def emit(self, d, v):
-            if d is not None:
-                if d[0] == 0x03: #analog axis
-                    # To map from [0x0, 0x7fff] to [0x1, 0x8000], just sum 1.
-                    self.axes[d[1]] = v + 1
-                else:
-                    self.buttons |= (v << d[1])
-        def flush(self):
-            # Struct JOYSTICK_POSITION_V2's definition can be found at
-            # https://github.com/shauleiz/vJoy/blob/2c9a6f14967083d29f5a294b8f5ac65d3d42ac87/SDK/inc/public.h#L203
-            # It's basically:
-            # 1 BYTE for device ID
-            # 3 unused LONGs
-            # 8 LONGs for axes
-            # 7 unused LONGs
-            # 1 LONGs for buttons
-            # 4 DWORDs for hats
-            # 3 LONGs for buttons
-            self.lib.UpdateVJD(self.id, self.outStruct.pack(
-                self.id, # 1 BYTE for device ID
-                0, 0, 0, # 3 unused LONGs
-                *self.axes, # 8 LONGs for axes and 7 unused LONGs
-                self.buttons & 0xffffffff, # 1 LONG for buttons
-                0, 0, 0, 0, # 4 DWORDs for hats
-                (self.buttons >> 32) & 0xffffffff,
-                (self.buttons >> 64) & 0xffffffff,
-                (self.buttons >> 96) & 0xffffffff # 3 LONGs for buttons
-            ))
-
-            # This allows a very simple emit() definition:
-            self.buttons = 0
-        def close(self):
-            self.device.close()
-            self.bytestring = b''
 
 class Service:
     sock = None
