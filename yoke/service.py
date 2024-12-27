@@ -141,6 +141,13 @@ class Service:
                         # NULL BYTE: status report from the game controller.
                         if (m[0] == 0):
                             for ev, val in zip(self.dev.events, self.preprocess(m)):
+                                if ev[0] == 3:
+                                    if ev[1] == 27:
+                                        val = max(min(val - 10384, 4999), -5000) + 16384
+                                    elif ev[1] == 8:
+                                        val = max(min((val - 16384) * 2, 4999), -5000) + 16384
+                                    else:
+                                        val = max(min(val - 16384, 4999), -5000) + 16384
                                 self.dev.emit(ev, val)
                             self.dev.flush()
                         # 0xFF BYTE: request for disconnection. Same effect as a timeout.
